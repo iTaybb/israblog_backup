@@ -141,7 +141,7 @@ function drawNavigateLink(blogid,BlogCat,BlogYear,BlogMonth,BlogDay,position,pag
 		document.write(page+"      ")
 	 else
 			{		
-			url="?blog="+blogid+"&catcode="+BlogCat+"&year="+BlogYear+"&month="+BlogMonth+"&day="+BlogDay+"&pagenum="+position+"&catdesc="+escape(BlogCatDesc)
+			url= BlogYear+"-"+BlogMonth+"-p"+position+".htm"
 			document.write("<a class=blog href='"+url+"'>"+position+"</a>&nbsp;&nbsp;")
 			}
 }
@@ -255,11 +255,6 @@ function getCommentsURL(blogCode, newComment, userCode, commentID)
 				 url = "comments-";
 				 url += blogCode;
 				 url += "-p1.htm";
-				 //url += "&blog=";
-				 //url += blogCode;
-				 //url += "&user=";
-				 //url += userCode;
-				 //url += "&commentuser="+userCode+"&origcommentuser="+userCode + "#" + commentID;
 				 return url;
 }
  function openCommentWnd(blogCode, newComment, userCode, commentID)

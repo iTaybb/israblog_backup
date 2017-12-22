@@ -12,15 +12,6 @@ from bs4 import BeautifulSoup
 import colorama
 import progressbar
 
-'''
-TODO:
-
-Fix bad css/js
-file:///C:/Users/user/Desktop/blog%20699999/2012-5-p1.htm?blog=699999&catcode=&year=2012&month=5&day=0&pagenum=2&catdesc= מספרי דפים לא עובדים
-upload to github
-post
-'''
-
 ### VARS ###
 __VERSION__ = '2017.12.22'
 CHUNKS_OUTPUT_PATH = r'd:\tmp'
@@ -32,12 +23,12 @@ USERAGENT = 'IsrablogScrapper {}'.format(__VERSION__)
 WORKING_DIR = getattr(sys, '_MEIPASS', os.path.dirname(os.path.realpath(__file__)))
 INJECT_DIR = os.path.join(WORKING_DIR, 'inject')
 BACKUP_FOLDER = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
-LOGGING_LEVEL = logging.ERROR
+LOGGING_LEVEL = logging.WARN
 ENABLE_PROGRESSBAR = True
 
 blog_page_regex = re.compile(r'\?blog=\d+&page=(\d+)')
 blog_post_regex = re.compile(r'.*\?blog=\d+&blogcode=(\d+)')
-blog_month_regex = re.compile(r'^\?blog=\d+&year=(\d+)&month=(\d+)')
+blog_month_regex = re.compile(r'^\?blog=\d+&year=(\d+)&month=(\d+)(?:&.*pagenum=(\d+))?')
 drawmonthlink_regex = re.compile(r'drawMonthLinkNew')
 commentlink_regex = re.compile(r'comments\.asp\?newcomment=&blog=(\d+)&user=\d+&commentuser=&origcommentuser=&posnew=(\d+)')
 
@@ -179,7 +170,8 @@ def replace_internal_resources(soup, previous_month=None, next_month=None, saveT
 		t['href'] = get_local_path(intent='posts', relative=True, postid=re.match(blog_post_regex, t['href']).group(1))
 
 	for t in soup.find_all('a', href=blog_month_regex):
-		t['href'] = get_local_path(relative=True, year=re.match(blog_month_regex, t['href']).group(1), month=re.match(blog_month_regex, t['href']).group(2))
+		m = re.match(blog_month_regex, t['href'])
+		t['href'] = get_local_path(relative=True, year=m.group(1), month=m.group(2), pagenum=m.group(3) if m.group(3) else 1)
 
 	#edit TDtitle link
 	t = soup.find('a', class_='TDtitle')
@@ -203,7 +195,7 @@ def replace_internal_resources(soup, previous_month=None, next_month=None, saveT
 		if previous_month:
 			month, year = previous_month.split('/')
 			elem = soup.new_tag('a', href=get_local_path(relative=True, year=year, month=month))
-			elem.string = "        החודש הקודם ({0})".format(previous_month)
+			elem.string = " החודש הקודם ({0})".format(previous_month)
 			new_tag.insert(1, elem)
 
 		if next_month:
@@ -318,7 +310,7 @@ def main(blog_id, dl_path, fast=False):
 
 	# Archive Dates
 	archive_dates = [x.get('value') for x in main_soup.find('select', id="PeriodsForUser").find_all('option')]
-	archive_dates.sort(key=lambda x: x.split('/')[1] + x.split('/')[0], reverse=True)
+	archive_dates.sort(key=lambda x: x.split('/')[1] + "{:02d}".format(int(x.split('/')[0])), reverse=True)
 	print("Downloading archive pages...")
 	if ENABLE_PROGRESSBAR:
 		bar = progressbar.ProgressBar(max_value=len(archive_dates)).start()
@@ -340,8 +332,8 @@ def main(blog_id, dl_path, fast=False):
 			pages_count = int(t.text.strip().split('=')[1].strip(';')) if t else 1
 			logging.info("Pages count for {}/{}: {}".format(year, month, pages_count))
 
-			replace_internal_resources(soup, next_month=next_month, previous_month=previous_month, saveTo=get_local_path(year=year, month=month, pagenum=pagenum, dl_path=dl_path))
 			dl_and_replace_external_resources(soup, dl_path, fast=fast)
+			replace_internal_resources(soup, next_month=next_month, previous_month=previous_month, saveTo=get_local_path(year=year, month=month, pagenum=pagenum, dl_path=dl_path))
 
 			pagenum += 1
 
