@@ -13,10 +13,7 @@ import colorama
 import progressbar
 
 ### VARS ###
-__VERSION__ = '2017.12.22'
-CHUNKS_OUTPUT_PATH = r'd:\tmp'
-CHUNK_SIZE = 5000
-MAX_BLOG_SCAN = 900000
+__VERSION__ = '2017.12.24'
 ISRABLOG_HOSTNAME = 'http://israblog.nana10.co.il'
 REFERER = "{}/blogread.asp?blog={}"  # formatted just before main()
 USERAGENT = 'IsrablogScrapper {}'.format(__VERSION__)
@@ -26,6 +23,12 @@ BACKUP_FOLDER = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
 LOGGING_LEVEL = logging.WARN
 ENABLE_PROGRESSBAR = True
 
+# only for chunks. not relevant for backuping the blog
+CHUNKS_OUTPUT_PATH = r'd:\tmp'  
+CHUNK_SIZE = 5000
+MAX_BLOG_SCAN = 900000
+
+# regexes
 blog_page_regex = re.compile(r'\?blog=\d+&page=(\d+)')
 blog_post_regex = re.compile(r'.*\?blog=\d+&blogcode=(\d+)')
 blog_month_regex = re.compile(r'^\?blog=\d+&year=(\d+)&month=(\d+)(?:&.*pagenum=(\d+))?')
@@ -153,7 +156,7 @@ def dl_and_replace_external_resources(soup, dl_path, fast=False):
 
 def dl_external_resource(link, dl_path):
 	parsed = urllib.parse.urlparse(link)
-	local_path = os.path.join(dl_path, parsed.netloc, parsed.path.strip('/').replace('/', '\\'))
+	local_path = os.path.join(dl_path, parsed.netloc, parsed.path.strip('./').replace('/', '\\'))
 	dl_file(link, local_path, encoding=None)
 
 	localpath = "{}/{}".format(parsed.netloc, parsed.path) if parsed.netloc else link.strip('/')
