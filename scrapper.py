@@ -13,7 +13,7 @@ import colorama
 import progressbar
 
 ### VARS ###
-__VERSION__ = '2017.12.24'
+__VERSION__ = '2017.12.24-2'
 ISRABLOG_HOSTNAME = 'http://israblog.nana10.co.il'
 REFERER = "{}/blogread.asp?blog={}"  # formatted just before main()
 USERAGENT = 'IsrablogScrapper {}'.format(__VERSION__)
@@ -32,12 +32,13 @@ MAX_BLOG_SCAN = 900000
 blog_page_regex = re.compile(r'\?blog=\d+&page=(\d+)')
 blog_post_regex = re.compile(r'.*\?blog=\d+&blogcode=(\d+)')
 blog_month_regex = re.compile(r'^\?blog=\d+&year=(\d+)&month=(\d+)(?:&.*pagenum=(\d+))?')
+blog_readlist_regex = re.compile(r'^BlogReadLists\.asp\?blog=\d+&(?:.*)ListColumns=(\d+)&SideGroup=(\d+)')
 drawmonthlink_regex = re.compile(r'drawMonthLinkNew')
 commentlink_regex = re.compile(r'comments\.asp\?newcomment=&blog=(\d+)&user=\d+&commentuser=&origcommentuser=&posnew=(\d+)')
 
 
 ### FUNCS ###
-def get_local_path(intent='main', year=None, month=None, postid=None, pagenum=1, relative=False, dl_path=None):
+def get_local_path(intent='main', year=None, month=None, postid=None, pagenum=1, relative=False, dl_path=None, sidebar_cols=None, sidebar_group=None):
 	if intent == 'main':
 		if not year and not month:
 			path = 'index.htm'
@@ -58,7 +59,7 @@ def get_local_path(intent='main', year=None, month=None, postid=None, pagenum=1,
 		else:
 			path = 'comments-{}-p{}.htm'.format(postid, pagenum)
 	elif intent == 'sidebar':
-		path = 'sidebar.htm'.format(postid)
+		path = 'sidebar-{}-{}.htm'.format(sidebar_cols, sidebar_group)
 
 	if not relative:
 		if not dl_path:
@@ -82,7 +83,7 @@ def get_url(blog_id, postid=None, intent='main', **kwargs):
 	else:
 		raise Exception("Not possible!")
 
-	for k,v in kwargs.items():
+	for k, v in kwargs.items():
 		url += "&{}={}".format(k, v)
 
 	return url
@@ -157,7 +158,10 @@ def dl_and_replace_external_resources(soup, dl_path, fast=False):
 def dl_external_resource(link, dl_path):
 	parsed = urllib.parse.urlparse(link)
 	local_path = os.path.join(dl_path, parsed.netloc, parsed.path.strip('./').replace('/', '\\'))
-	dl_file(link, local_path, encoding=None)
+	try:
+		dl_file(link, local_path, encoding=None)
+	except Exception as e:
+		logging.error('Could not download %s: %s', link, str(e))
 
 	localpath = "{}/{}".format(parsed.netloc, parsed.path) if parsed.netloc else link.strip('/')
 	return localpath
@@ -168,9 +172,9 @@ def replace_internal_resources(soup, previous_month=None, next_month=None, saveT
 		t['href'] = get_local_path(intent='board_list', relative=True, pagenum=re.match(blog_page_regex, t['href']).group(1))
 
 	for t in soup.find_all('a', href=blog_post_regex):
-		if not re.match(blog_post_regex, t['href']):
-			import pdb; pdb.set_trace()
 		t['href'] = get_local_path(intent='posts', relative=True, postid=re.match(blog_post_regex, t['href']).group(1))
+	for t in soup.find_all('option', value=blog_post_regex):
+		t['value'] = get_local_path(intent='posts', relative=True, postid=re.match(blog_post_regex, t['value']).group(1))
 
 	for t in soup.find_all('a', href=blog_month_regex):
 		m = re.match(blog_month_regex, t['href'])
@@ -186,10 +190,10 @@ def replace_internal_resources(soup, previous_month=None, next_month=None, saveT
 	if t:
 		t['src'] = get_local_path(intent='board_list', relative=True)
 
-	# sidebar
-	t = soup.find('iframe', id='ListFrame_0')
-	if t:
-		t['src'] = get_local_path(intent='sidebar', relative=True)
+	# sidebar(s)
+	for tag in soup.find_all('iframe', src=blog_readlist_regex):
+		m = re.match(blog_readlist_regex, tag['src'])
+		tag['src'] = get_local_path(intent='sidebar', relative=True, sidebar_cols=m.group(1), sidebar_group=m.group(2))
 
 	# drawMonthLinkNew
 	t = soup.find('script', text=drawmonthlink_regex)
@@ -294,6 +298,16 @@ def main(blog_id, dl_path, fast=False):
 	main_soup = BeautifulSoup(raw, 'html.parser')
 	main_soup = dl_and_replace_external_resources(main_soup, dl_path, fast=fast)
 
+	# sidebar
+	print("Downloading sidebar page(s)...")
+	for tag in main_soup.find_all('iframe', src=blog_readlist_regex):
+		m = re.match(blog_readlist_regex, tag['src'])
+
+		raw = dl_file(get_url(blog_id=blog_id, intent='sidebar', ListColumns=m.group(1), SideGroup=m.group(2)), get_local_path(intent='sidebar', dl_path=dl_path, sidebar_cols=m.group(1), sidebar_group=m.group(2)))
+		soup = BeautifulSoup(raw, 'html.parser')
+		dl_and_replace_external_resources(soup, dl_path, fast=fast)
+		replace_internal_resources(soup, saveTo=get_local_path(intent='sidebar', dl_path=dl_path, sidebar_cols=m.group(1), sidebar_group=m.group(2)))
+
 	# Board List
 	print("Downloading board list...")
 	pagenum = 1
@@ -362,13 +376,6 @@ def main(blog_id, dl_path, fast=False):
 			bar.update(i)
 	if ENABLE_PROGRESSBAR:
 		bar.finish()
-
-	# sidebar
-	print("Downloading sidebar page...")
-	raw = dl_file(get_url(blog_id=blog_id, intent='sidebar'), get_local_path(intent='sidebar', dl_path=dl_path))
-	soup = BeautifulSoup(raw, 'html.parser')
-	dl_and_replace_external_resources(soup, dl_path, fast=fast)
-	replace_internal_resources(soup, saveTo=get_local_path(intent='sidebar', dl_path=dl_path))
 
 	# Comments
 	print("Downloading comment pages...")

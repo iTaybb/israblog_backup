@@ -1,4 +1,4 @@
-# israblog_scrapper
+# israblog_backup
 A backup tool for Israblog
 Useful for backing Israblog blogs until the site's going down (at 31/12/2017).
 
