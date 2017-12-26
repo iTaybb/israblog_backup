@@ -13,7 +13,7 @@ import colorama
 import progressbar
 
 ### VARS ###
-__VERSION__ = '2017.12.24-2'
+__VERSION__ = '2017.12.27'
 ISRABLOG_HOSTNAME = 'http://israblog.nana10.co.il'
 REFERER = "{}/blogread.asp?blog={}"  # formatted just before main()
 USERAGENT = 'IsrablogScrapper {}'.format(__VERSION__)
@@ -35,6 +35,7 @@ blog_month_regex = re.compile(r'^\?blog=\d+&year=(\d+)&month=(\d+)(?:&.*pagenum=
 blog_readlist_regex = re.compile(r'^BlogReadLists\.asp\?blog=\d+&(?:.*)ListColumns=(\d+)&SideGroup=(\d+)')
 drawmonthlink_regex = re.compile(r'drawMonthLinkNew')
 commentlink_regex = re.compile(r'comments\.asp\?newcomment=&blog=(\d+)&user=\d+&commentuser=&origcommentuser=&posnew=(\d+)')
+listframe_regex = re.compile(r'^ListFrame_\d$')
 
 
 ### FUNCS ###
@@ -123,8 +124,9 @@ def dl_file(src, dst, encoding='windows-1255', force=False):
 
 		with open(dst, 'wb') as f:
 			if encoding:
-				raw = raw.encode(encoding, 'surrogateescape')
-			f.write(raw)
+				f.write(raw.encode(encoding, 'surrogateescape'))
+			else:
+				f.write(raw)
 
 	return raw
 
@@ -234,6 +236,15 @@ def replace_internal_resources(soup, previous_month=None, next_month=None, saveT
 		if t:
 			t.parent.parent.extract()
 
+	# inject iframeResizer
+	already_injected = False
+	for tag in soup.find_all('iframe', id=listframe_regex):
+		if not already_injected:
+			tag.insert_after(BeautifulSoup("""<script type="text/javascript" src="iframeResizer.min.js"></script><script>iFrameResize({{log:false}}, '#{0}')</script>""".format(tag['id']), 'html.parser'))
+			already_injected = True
+		else:
+			tag.insert_after(BeautifulSoup("""</script><script>iFrameResize({{log:false}}, '#{0}')</script>""".format(tag['id']), 'html.parser'))
+
 	if saveTo:
 		with open(saveTo, 'wb') as f:
 			f.write(soup.prettify(encoding, formatter='html'))
@@ -304,6 +315,7 @@ def main(blog_id, dl_path, fast=False):
 		m = re.match(blog_readlist_regex, tag['src'])
 
 		raw = dl_file(get_url(blog_id=blog_id, intent='sidebar', ListColumns=m.group(1), SideGroup=m.group(2)), get_local_path(intent='sidebar', dl_path=dl_path, sidebar_cols=m.group(1), sidebar_group=m.group(2)))
+		raw = raw.replace('</body>', '<script type="text/javascript" src="iframeResizer.contentWindow.min.js"></script></body>')  # adding iframeResizer
 		soup = BeautifulSoup(raw, 'html.parser')
 		dl_and_replace_external_resources(soup, dl_path, fast=fast)
 		replace_internal_resources(soup, saveTo=get_local_path(intent='sidebar', dl_path=dl_path, sidebar_cols=m.group(1), sidebar_group=m.group(2)))
