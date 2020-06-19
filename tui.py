@@ -21,7 +21,14 @@ if len(sys.argv) >= 2:
 	if not scrapper.is_blog_exists(blogid):
 		print(colorama.Fore.RED + colorama.Style.BRIGHT + "Blog does not exist, or it's private." + colorama.Style.RESET_ALL + " If it's private, please set it to public beforehand.")
 		sys.exit(1)
+
+	if len(sys.argv) >= 3:
+		print("Setting Israblog Hostname to {}".format(sys.argv[2]))
+		scrapper.ISRABLOG_HOSTNAME = sys.argv[2]
 else:
+	ans = input("Please enter Israblog current URL, or leave empty for default: [{}] ".format(scrapper.ISRABLOG_HOSTNAME))
+	if ans:
+		scrapper.ISRABLOG_HOSTNAME = ans
 	while True:
 		blogid = input("Please enter the blog ID you want to backup: ")
 		while not blogid or not blogid.isdigit() or not 1 <= int(blogid) <= 900000:

@@ -13,8 +13,8 @@ import colorama
 import progressbar
 
 ### VARS ###
-__VERSION__ = '2017.12.27'
-ISRABLOG_HOSTNAME = 'http://israblog.nana10.co.il'
+__VERSION__ = '2020.06.19'
+ISRABLOG_HOSTNAME = 'http://israblog.org'
 REFERER = "{}/blogread.asp?blog={}"  # formatted just before main()
 USERAGENT = 'IsrablogScrapper {}'.format(__VERSION__)
 WORKING_DIR = getattr(sys, '_MEIPASS', os.path.dirname(os.path.realpath(__file__)))
